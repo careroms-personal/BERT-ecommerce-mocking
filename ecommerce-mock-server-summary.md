@@ -36,7 +36,7 @@ api-gateway
 |-----------------------|-----------|-----------|------------------------|---------------|
 | api-gateway           | Go        | Zap       | JSON structured        | ❌ No DB      |
 | api-product           | Go        | Zap       | JSON structured        | PostgreSQL    |
-| api-cart              | Node.js   | Pino      | JSON + colorized       | MongoDB       |
+| api-cart              | Node.js (TypeScript) | Pino | JSON + colorized  | MongoDB       |
 | api-customer          | .NET      | Serilog   | JSON + .NET verbose    | PostgreSQL    |
 | api-order             | Go        | Zap       | JSON structured        | PostgreSQL    |
 | api-payment           | .NET      | Serilog   | .NET enterprise style  | MySQL         |

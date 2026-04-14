@@ -41,6 +41,150 @@ services:
       start_period: 10s
 
   # ─────────────────────────────────────────────
+  # api-product (Go + Zap + PostgreSQL)
+  # ─────────────────────────────────────────────
+  api-product:
+    build: ./applications/api-product
+    container_name: api-product
+    restart: unless-stopped
+    environment:
+      PORT: "8081"
+      DATABASE_URL: "postgres://ecommerce:ecommerce_pass@postgres:5432/product_db?sslmode=disable"
+    ports:
+      - "8081:8081"
+    networks:
+      - ecommerce-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      fluent-bit:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ─────────────────────────────────────────────
+  # api-search (Rust + tracing + Elasticsearch)
+  # ─────────────────────────────────────────────
+  api-search:
+    build: ./applications/api-search
+    container_name: api-search
+    restart: unless-stopped
+    environment:
+      PORT: "8086"
+      ELASTICSEARCH_URL: "http://elasticsearch:9200"
+      RUST_LOG: "info"
+    ports:
+      - "8086:8086"
+    networks:
+      - ecommerce-net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      fluent-bit:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ─────────────────────────────────────────────
+  # api-payment (.NET + Serilog + MySQL)
+  # ─────────────────────────────────────────────
+  api-payment:
+    build: ./applications/api-payment
+    container_name: api-payment
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: "http://+:8085"
+      ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=payment_db;User=ecommerce;Password=ecommerce_pass;"
+      Payment__MaxRetries: "3"
+      Payment__ProviderTimeoutMs: "4000"
+      Payment__SuccessRate: "0.75"
+      Payment__DeclineRate: "0.15"
+    ports:
+      - "8085:8085"
+    networks:
+      - ecommerce-net
+    depends_on:
+      mysql:
+        condition: service_healthy
+      fluent-bit:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ─────────────────────────────────────────────
+  # api-order (Go + Zap + PostgreSQL)
+  # ─────────────────────────────────────────────
+  api-order:
+    build: ./applications/api-order
+    container_name: api-order
+    restart: unless-stopped
+    environment:
+      PORT: "8084"
+      DATABASE_URL: "postgres://ecommerce:ecommerce_pass@postgres:5432/order_db?sslmode=disable"
+      CART_SERVICE_URL: "http://api-cart:8083"
+      PRODUCT_SERVICE_URL: "http://api-product:8081"
+    ports:
+      - "8084:8084"
+    networks:
+      - ecommerce-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api-cart:
+        condition: service_healthy
+      api-product:
+        condition: service_healthy
+      fluent-bit:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ─────────────────────────────────────────────
+  # api-cart (Node.js + Pino + MongoDB)
+  # ─────────────────────────────────────────────
+  api-cart:
+    build: ./applications/api-cart
+    container_name: api-cart
+    restart: unless-stopped
+    environment:
+      PORT: "8083"
+      MONGO_URI: "mongodb://ecommerce:ecommerce_pass@mongodb:27017/cart_db?authSource=cart_db"
+      PRODUCT_SERVICE_URL: "http://api-product:8081"
+      PRETTY_LOGS: "false"
+    ports:
+      - "8083:8083"
+    networks:
+      - ecommerce-net
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      api-product:
+        condition: service_healthy
+      fluent-bit:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ─────────────────────────────────────────────
+  # api-customer (.NET + Serilog + PostgreSQL)
+  # ─────────────────────────────────────────────
+  api-customer:
+    build: ./applications/api-customer
+    container_name: api-customer
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: "http://+:8082"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=customer_db;Username=ecommerce;Password=ecommerce_pass"
+      Jwt__Secret: "ecommerce-mock-jwt-secret-change-in-prod-32chars"
+      Jwt__AccessTokenExpiryMinutes: "60"
+      Jwt__RefreshTokenExpiryDays: "7"
+    ports:
+      - "8082:8082"
+    networks:
+      - ecommerce-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      fluent-bit:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ─────────────────────────────────────────────
   # PostgreSQL — api-product, api-customer, api-order
   # ─────────────────────────────────────────────
   postgres:
