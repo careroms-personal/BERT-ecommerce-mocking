@@ -33,14 +33,15 @@ func Connect(dsn string) (*pgxpool.Pool, error) {
 func Migrate(db *pgxpool.Pool) error {
 	_, err := db.Exec(context.Background(), `
 		CREATE TABLE IF NOT EXISTS products (
-			id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			name        VARCHAR(255) NOT NULL,
-			description TEXT NOT NULL DEFAULT '',
-			price       NUMERIC(10,2) NOT NULL,
-			category    VARCHAR(100) NOT NULL DEFAULT '',
-			stock       INTEGER NOT NULL DEFAULT 0,
-			created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-			updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+			id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			name         VARCHAR(255) NOT NULL,
+			description  TEXT NOT NULL DEFAULT '',
+			price        NUMERIC(10,2) NOT NULL,
+			category     VARCHAR(100) NOT NULL DEFAULT '',
+			stock        INTEGER NOT NULL DEFAULT 0,
+			discontinued BOOLEAN NOT NULL DEFAULT FALSE,
+			created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
 
 		CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
@@ -58,7 +59,7 @@ func (r *ProductRepository) List(ctx context.Context, page, limit int, category 
 
 	countQuery := `SELECT COUNT(*) FROM products`
 	listQuery := `
-		SELECT id, name, description, price, category, stock, created_at, updated_at
+		SELECT id, name, description, price, category, stock, discontinued, created_at, updated_at
 		FROM products
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -68,7 +69,7 @@ func (r *ProductRepository) List(ctx context.Context, page, limit int, category 
 	if category != "" {
 		countQuery = `SELECT COUNT(*) FROM products WHERE category = $1`
 		listQuery = `
-			SELECT id, name, description, price, category, stock, created_at, updated_at
+			SELECT id, name, description, price, category, stock, discontinued, created_at, updated_at
 			FROM products
 			WHERE category = $3
 			ORDER BY created_at DESC
@@ -93,7 +94,7 @@ func (r *ProductRepository) List(ctx context.Context, page, limit int, category 
 	var products []model.Product
 	for rows.Next() {
 		var p model.Product
-		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.Stock, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.Stock, &p.Discontinued, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, 0, err
 		}
 		products = append(products, p)
@@ -107,9 +108,9 @@ func (r *ProductRepository) List(ctx context.Context, page, limit int, category 
 func (r *ProductRepository) GetByID(ctx context.Context, id string) (*model.Product, error) {
 	var p model.Product
 	err := r.db.QueryRow(ctx, `
-		SELECT id, name, description, price, category, stock, created_at, updated_at
+		SELECT id, name, description, price, category, stock, discontinued, created_at, updated_at
 		FROM products WHERE id = $1
-	`, id).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.Stock, &p.CreatedAt, &p.UpdatedAt)
+	`, id).Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.Stock, &p.Discontinued, &p.CreatedAt, &p.UpdatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -123,11 +124,11 @@ func (r *ProductRepository) GetByID(ctx context.Context, id string) (*model.Prod
 func (r *ProductRepository) Create(ctx context.Context, req model.CreateProductRequest) (*model.Product, error) {
 	var p model.Product
 	err := r.db.QueryRow(ctx, `
-		INSERT INTO products (name, description, price, category, stock)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, name, description, price, category, stock, created_at, updated_at
-	`, req.Name, req.Description, req.Price, req.Category, req.Stock).
-		Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.Stock, &p.CreatedAt, &p.UpdatedAt)
+		INSERT INTO products (name, description, price, category, stock, discontinued)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, name, description, price, category, stock, discontinued, created_at, updated_at
+	`, req.Name, req.Description, req.Price, req.Category, req.Stock, req.Discontinued).
+		Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.Stock, &p.Discontinued, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -155,15 +156,18 @@ func (r *ProductRepository) Update(ctx context.Context, id string, req model.Upd
 	if req.Stock != nil {
 		existing.Stock = *req.Stock
 	}
+	if req.Discontinued != nil {
+		existing.Discontinued = *req.Discontinued
+	}
 
 	var p model.Product
 	err = r.db.QueryRow(ctx, `
 		UPDATE products
-		SET name=$1, description=$2, price=$3, category=$4, stock=$5, updated_at=NOW()
-		WHERE id=$6
-		RETURNING id, name, description, price, category, stock, created_at, updated_at
-	`, existing.Name, existing.Description, existing.Price, existing.Category, existing.Stock, id).
-		Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.Stock, &p.CreatedAt, &p.UpdatedAt)
+		SET name=$1, description=$2, price=$3, category=$4, stock=$5, discontinued=$6, updated_at=NOW()
+		WHERE id=$7
+		RETURNING id, name, description, price, category, stock, discontinued, created_at, updated_at
+	`, existing.Name, existing.Description, existing.Price, existing.Category, existing.Stock, existing.Discontinued, id).
+		Scan(&p.ID, &p.Name, &p.Description, &p.Price, &p.Category, &p.Stock, &p.Discontinued, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
