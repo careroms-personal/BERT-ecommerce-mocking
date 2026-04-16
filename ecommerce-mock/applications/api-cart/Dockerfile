@@ -28,7 +28,4 @@ ENV PRETTY_LOGS=false
 
 EXPOSE 8083
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
-    CMD curl -sf http://localhost:8083/health || exit 1
-
 CMD ["node", "dist/index.js"]

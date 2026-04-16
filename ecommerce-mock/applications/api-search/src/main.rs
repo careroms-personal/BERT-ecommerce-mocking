@@ -6,7 +6,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -36,26 +35,24 @@ async fn main() {
     // ── Elasticsearch client ──────────────────────────────────────────────────
     let es = EsClient::new(cfg.elasticsearch_url.clone());
 
-    // Wait for ES to be reachable
+    // Try to reach ES — log warning if unavailable, continue anyway
     let mut attempts = 0u32;
     loop {
         if es.ping().await {
             info!(service = "api-search", category = "SYSTEM", "elasticsearch connected");
+            match es.ensure_index().await {
+                Ok(_)  => info!(service = "api-search", category = "SYSTEM", index = elastic::INDEX, "products index ready"),
+                Err(e) => error!(service = "api-search", category = "SEARCH_UNAVAILABLE", error = %e, "failed to ensure index"),
+            }
             break;
         }
         attempts += 1;
         if attempts >= 10 {
-            error!(service = "api-search", category = "SEARCH_UNAVAILABLE", "elasticsearch not reachable after 10 attempts, exiting");
-            std::process::exit(1);
+            error!(service = "api-search", category = "SEARCH_UNAVAILABLE", "elasticsearch not reachable, starting without it — search requests will return errors");
+            break;
         }
         info!(service = "api-search", category = "SYSTEM", attempt = attempts, "waiting for elasticsearch...");
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-    }
-
-    // Ensure products index exists
-    match es.ensure_index().await {
-        Ok(_)  => info!(service = "api-search", category = "SYSTEM", index = elastic::INDEX, "products index ready"),
-        Err(e) => error!(service = "api-search", category = "SEARCH_UNAVAILABLE", error = %e, "failed to ensure index"),
     }
 
     let state = AppState { es };
@@ -67,9 +64,7 @@ async fn main() {
         .route("/search/suggest", get(handlers::suggest))
         .route("/search/index",   post(handlers::index_document))
         .with_state(state)
-        .layer(TraceLayer::new_for_http())
-        .layer(PropagateRequestIdLayer::x_request_id())
-        .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid));
+        .layer(TraceLayer::new_for_http());
 
     let addr = format!("0.0.0.0:{}", cfg.port);
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();

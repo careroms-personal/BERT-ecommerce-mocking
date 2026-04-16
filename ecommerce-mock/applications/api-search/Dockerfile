@@ -1,17 +1,14 @@
-FROM rust:1.82-alpine AS builder
+FROM rust:1.86-alpine AS builder
 
-RUN apk add --no-cache musl-dev pkgconfig openssl-dev
+# musl-dev is all we need — no OpenSSL since we use rustls
+RUN apk add --no-cache musl-dev
 
 WORKDIR /app
 
-# Cache dependencies layer
 COPY Cargo.toml ./
-RUN mkdir src && echo 'fn main() {}' > src/main.rs && \
-    cargo build --release 2>/dev/null || true && \
-    rm -rf src
-
 COPY src ./src
-RUN touch src/main.rs && cargo build --release
+
+RUN cargo build --release
 
 # ─────────────────────────────────────────────
 FROM alpine:3.20
@@ -23,7 +20,5 @@ COPY --from=builder /app/target/release/api-search .
 
 EXPOSE 8086
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl -sf http://localhost:8086/health || exit 1
 
 CMD ["./api-search"]

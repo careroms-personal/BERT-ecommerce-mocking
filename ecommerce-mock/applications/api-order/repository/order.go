@@ -19,14 +19,13 @@ type OrderRepository struct {
 }
 
 func Connect(dsn string) (*pgxpool.Pool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	pool, err := pgxpool.New(ctx, dsn)
+	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
-	if err := pool.Ping(ctx); err != nil {
+	cfg.LazyConnect = true
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
 		return nil, err
 	}
 	return pool, nil

@@ -20,7 +20,4 @@ COPY --from=builder /api-product .
 
 EXPOSE 8081
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -sf http://localhost:8081/health || exit 1
-
 CMD ["./api-product"]

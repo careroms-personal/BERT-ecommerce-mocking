@@ -19,7 +19,4 @@ COPY --from=builder /api-order .
 
 EXPOSE 8084
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -sf http://localhost:8084/health || exit 1
-
 CMD ["./api-order"]

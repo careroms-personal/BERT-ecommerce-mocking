@@ -41,11 +41,19 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        using (LogContext.PushProperty("Category", "SYSTEM"))
+        try
         {
-            Log.Information("Running database migration");
-            db.Database.EnsureCreated();
-            Log.Information("Database migration complete");
+            using (LogContext.PushProperty("Category", "SYSTEM"))
+            {
+                Log.Information("Running database migration");
+                db.Database.EnsureCreated();
+                Log.Information("Database migration complete");
+            }
+        }
+        catch (Exception ex)
+        {
+            using (LogContext.PushProperty("Category", "DB_ERROR"))
+                Log.Error(ex, "Database migration failed, continuing without schema — requests may fail");
         }
     }
 

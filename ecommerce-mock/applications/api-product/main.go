@@ -30,27 +30,26 @@ func main() {
 
 	db, err := repository.Connect(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatal("failed to connect to database",
+		log.Error("failed to parse database config, requests will fail",
 			zap.String("category", "DB_ERROR"),
 			zap.Error(err),
 		)
-	}
-	defer db.Close()
-
-	log.Info("database connected",
-		zap.String("category", "SYSTEM"),
-	)
-
-	if err := repository.Migrate(db); err != nil {
-		log.Fatal("migration failed",
-			zap.String("category", "DB_ERROR"),
-			zap.Error(err),
+	} else {
+		defer db.Close()
+		log.Info("database pool created (lazy connect)",
+			zap.String("category", "SYSTEM"),
 		)
+		if err := repository.Migrate(db); err != nil {
+			log.Error("migration failed, continuing without schema",
+				zap.String("category", "DB_ERROR"),
+				zap.Error(err),
+			)
+		} else {
+			log.Info("database migration ok",
+				zap.String("category", "SYSTEM"),
+			)
+		}
 	}
-
-	log.Info("database migration ok",
-		zap.String("category", "SYSTEM"),
-	)
 
 	repo := repository.NewProductRepository(db)
 	h := handler.NewProductHandler(repo, log)

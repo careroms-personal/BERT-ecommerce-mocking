@@ -1,7 +1,7 @@
-import type { FastifyLoggerOptions } from 'fastify';
+import type { LoggerOptions } from 'pino';
 import config from './config';
 
-const loggerOptions: FastifyLoggerOptions = {
+const loggerOptions: LoggerOptions = {
   level: 'info',
   base: { service: 'api-cart' },
   // ISO timestamp keeps it consistent with Go/Rust services

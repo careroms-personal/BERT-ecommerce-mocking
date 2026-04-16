@@ -13,8 +13,7 @@ async function start(): Promise<void> {
     await connectDB(fastify.log);
   } catch (err) {
     const e = err as Error;
-    fastify.log.fatal({ category: 'DB_ERROR', err: e.message }, 'failed to connect to MongoDB');
-    process.exit(1);
+    fastify.log.error({ category: 'DB_ERROR', err: e.message }, 'failed to connect to MongoDB, continuing — requests may fail');
   }
 
   fastify.get('/health', async () => {
