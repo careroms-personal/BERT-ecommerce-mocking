@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import { connectDB } from './db';
 import cartRoutes from './routes/cart';
+import cartSimRoutes from './routes/cart-5x';
 import loggerOptions from './logger';
 import config from './config';
 
@@ -21,6 +22,7 @@ async function start(): Promise<void> {
     return { status: 'ok', service: 'api-cart' };
   });
 
+  fastify.register(cartSimRoutes);
   fastify.register(cartRoutes);
 
   fastify.addHook('onResponse', (request, reply, done) => {

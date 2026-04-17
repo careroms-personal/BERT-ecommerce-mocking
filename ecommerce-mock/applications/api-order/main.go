@@ -49,6 +49,7 @@ func main() {
 
 	repo := repository.NewOrderRepository(db)
 	h := handler.NewOrderHandler(repo, log, cfg.CartServiceURL, cfg.ProductServiceURL)
+	sim := handler.NewOrderSimHandler(db, log)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -56,6 +57,7 @@ func main() {
 
 	r.GET("/health", h.Health)
 	r.POST("/orders", h.CreateOrder)
+	r.GET("/orders/sim/bad-column", sim.BadColumn)
 	r.GET("/orders/:id", h.GetOrder)
 	r.GET("/orders/customer/:customerId", h.ListByCustomer)
 	r.PUT("/orders/:id/status", h.UpdateStatus)

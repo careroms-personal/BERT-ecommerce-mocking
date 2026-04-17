@@ -53,6 +53,7 @@ func main() {
 
 	repo := repository.NewProductRepository(db)
 	h := handler.NewProductHandler(repo, log)
+	sim := handler.NewSimHandler(db, log)
 
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -60,6 +61,7 @@ func main() {
 
 	r.GET("/health", h.Health)
 	r.GET("/products", h.ListProducts)
+	r.GET("/products/sim/bad-column", sim.BadColumn)
 	r.GET("/products/:id", h.GetProduct)
 	r.POST("/products", h.CreateProduct)
 	r.PUT("/products/:id", h.UpdateProduct)
