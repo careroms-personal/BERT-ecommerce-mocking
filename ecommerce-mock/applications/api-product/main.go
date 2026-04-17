@@ -62,6 +62,8 @@ func main() {
 	r.GET("/health", h.Health)
 	r.GET("/products", h.ListProducts)
 	r.GET("/products/sim/bad-column", sim.BadColumn)
+	r.POST("/products/sim/bad-insert", sim.BadInsert)
+	r.DELETE("/products/sim/bad-delete", sim.BadDelete)
 	r.GET("/products/:id", h.GetProduct)
 	r.POST("/products", h.CreateProduct)
 	r.PUT("/products/:id", h.UpdateProduct)
