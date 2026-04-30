@@ -59,6 +59,7 @@ func main() {
 	r.POST("/orders", h.CreateOrder)
 	r.GET("/orders/sim/bad-column", sim.BadColumn)
 	r.POST("/orders/sim/bad-insert", sim.BadInsert)
+	r.PUT("/orders/sim/bad-update", sim.BadUpdate)
 	r.DELETE("/orders/sim/bad-delete", sim.BadDelete)
 	r.GET("/orders/:id", h.GetOrder)
 	r.GET("/orders/customer/:customerId", h.ListByCustomer)

@@ -9,6 +9,7 @@ package handler
 // Endpoints
 //   GET    /products/sim/bad-column   → SELECT not_existed FROM products → 500
 //   POST   /products/sim/bad-insert   → INSERT INTO products (not_existed) → 500
+//   PUT    /products/sim/bad-update   → UPDATE products SET not_existed → 500
 //   DELETE /products/sim/bad-delete   → DELETE FROM products WHERE not_existed → 500
 
 import (
@@ -186,4 +187,56 @@ func (h *SimHandler) BadDelete(c *gin.Context) {
 		zap.String("request_id", reqID.(string)),
 	)
 	c.JSON(http.StatusOK, gin.H{"sim": "bad-delete", "result": "unexpected_success"})
+}
+
+// BadUpdate runs an UPDATE that references a column that does not exist in the
+// products table. PostgreSQL will return:
+//   ERROR: column "not_existed" of relation "products" does not exist (SQLSTATE 42703)
+func (h *SimHandler) BadUpdate(c *gin.Context) {
+	reqID, _ := c.Get("request_id")
+
+	h.log.Info("sim: bad-update triggered",
+		zap.String("category", "SIM"),
+		zap.String("request_id", reqID.(string)),
+	)
+
+	if h.db == nil {
+		h.log.Error("sim: database pool is nil",
+			zap.String("category", "DB_ERROR"),
+			zap.String("request_id", reqID.(string)),
+		)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":    "database pool unavailable",
+			"sim":      "bad-update",
+			"category": "DB_ERROR",
+		})
+		return
+	}
+
+	// Intentionally bad UPDATE — column "not_existed" does not exist.
+	_, err := h.db.Exec(context.Background(),
+		`UPDATE products SET not_existed = 'sim'`,
+	)
+
+	if err != nil {
+		h.log.Error("sim: update failed as expected",
+			zap.String("category", "DB_ERROR"),
+			zap.String("request_id", reqID.(string)),
+			zap.Error(err),
+		)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":    "database error",
+			"sim":      "bad-update",
+			"detail":   err.Error(),
+			"category": "DB_ERROR",
+		})
+		return
+	}
+
+	// Should never reach here.
+	h.log.Warn("sim: bad-update unexpectedly succeeded",
+		zap.String("category", "SIM"),
+		zap.String("request_id", reqID.(string)),
+	)
+	c.JSON(http.StatusOK, gin.H{"sim": "bad-update", "result": "unexpected_success"})
 }

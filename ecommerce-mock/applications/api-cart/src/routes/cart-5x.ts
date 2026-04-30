@@ -7,6 +7,7 @@
 // Endpoints
 //   GET    /cart/sim/bad-query    → aggregation with invalid pipeline stage → 500
 //   POST   /cart/sim/bad-insert   → bulkWrite with invalid array filter name → 500
+//   PUT    /cart/sim/bad-update   → bulkWrite with invalid array filter name → 500
 //   DELETE /cart/sim/bad-delete   → bulkWrite with invalid array filter name → 500
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -79,6 +80,45 @@ export default async function cartSimRoutes(fastify: FastifyInstance): Promise<v
       return reply.status(500).send({
         error: 'database error',
         sim: 'bad-insert',
+        detail: e.message,
+        category: 'DB_ERROR',
+      });
+    }
+  });
+
+  // ── PUT /cart/sim/bad-update ─────────────────────────────────────────────
+  // Attempts a bulkWrite update with an invalid $$ array filter variable name.
+  // MongoDB server rejects it:
+  //   MongoServerError: The array filter for identifier 'not$$existed' contains
+  //   an invalid use of '$'
+  fastify.put('/cart/sim/bad-update', async (
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) => {
+    const log = request.log;
+
+    log.info({ category: 'SIM' }, 'sim: bad-update triggered');
+
+    try {
+      await Cart.collection.bulkWrite([
+        {
+          updateOne: {
+            filter: { userId: 'sim' },
+            update: { $set: { not_existed: 'sim' } },
+            arrayFilters: [{ 'not$$existed': true }],
+          },
+        },
+      ]);
+
+      // Should never reach here.
+      log.warn({ category: 'SIM' }, 'sim: bad-update unexpectedly succeeded');
+      return reply.send({ sim: 'bad-update', result: 'unexpected_success' });
+    } catch (err) {
+      const e = err as Error;
+      log.error({ category: 'DB_ERROR', err: e.message }, 'sim: update failed as expected');
+      return reply.status(500).send({
+        error: 'database error',
+        sim: 'bad-update',
         detail: e.message,
         category: 'DB_ERROR',
       });
